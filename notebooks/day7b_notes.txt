@@ -1,0 +1,4 @@
+## Day 7B — Additional fine-tuning (gentle, no class weight boost)
+Result: 99.10% val accuracy (up from Day 5's 98.98%)
+Approach: unfroze top 30% of backbone again, learning rate 1e-6, 3 epochs, no class weight boosting.
+Day 7's original attempt with class weight boosting caused a regression to 96.09% — reverted and retried without it.
