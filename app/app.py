@@ -13,7 +13,7 @@ import os
 
 import numpy as np
 import tensorflow as tf
-from flask import Flask, render_template, request
+from flask import Flask, jsonify, render_template, request
 from PIL import Image
 
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -34,7 +34,7 @@ def get_model():
         model = tf.keras.models.load_model(MODEL_PATH)
         with open(CLASS_NAMES_PATH) as f:
             class_names = json.load(f)
-        print("Model loaded ✅")
+        print("Model loaded OK")
     return model, class_names
 
 
@@ -83,6 +83,20 @@ def index():
                 error = f"Couldn't read that image: {exc}"
 
     return render_template("index.html", results=results, error=error)
+
+
+@app.route("/predict", methods=["POST"])
+def predict():
+    """JSON endpoint for AJAX predictions — returns {results, error}."""
+    file = request.files.get("leaf_image")
+    if not file or file.filename == "":
+        return jsonify({"error": "Please choose an image first.", "results": None}), 400
+    try:
+        pil_image = Image.open(file.stream)
+        results = predict_image(pil_image)
+        return jsonify({"results": results, "error": None})
+    except Exception as exc:
+        return jsonify({"error": f"Couldn't read that image: {exc}", "results": None}), 500
 
 
 if __name__ == "__main__":
