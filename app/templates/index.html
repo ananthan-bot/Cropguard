@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CropGuard — Plant Disease Diagnosis</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+  <main class="page">
+    <header class="header">
+      <span class="header__mark">🌿</span>
+      <div>
+        <h1 class="header__title">CropGuard</h1>
+        <p class="header__subtitle">Upload a leaf photo, get a diagnosis in seconds — 38 species covered</p>
+      </div>
+    </header>
+
+    <form class="card" method="POST" enctype="multipart/form-data" id="diagnose-form">
+      <label class="dropzone" id="dropzone" for="leaf_image">
+        <img id="preview" class="dropzone__preview" alt="" hidden>
+        <div id="dropzone-empty" class="dropzone__empty">
+          <span class="dropzone__icon">📷</span>
+          <span class="dropzone__text">Click or drag a leaf photo here</span>
+          <span class="dropzone__hint">JPG or PNG, one leaf, decent lighting</span>
+        </div>
+      </label>
+      <input type="file" id="leaf_image" name="leaf_image" accept="image/*" hidden>
+
+      <button type="submit" class="btn">Diagnose this leaf</button>
+
+      {% if error %}
+        <p class="form-error">{{ error }}</p>
+      {% endif %}
+    </form>
+
+    {% if results %}
+    <section class="tag-wrap" aria-live="polite">
+      <div class="tag">
+        <div class="tag__hole"></div>
+        <p class="tag__eyebrow">Most likely diagnosis</p>
+        <h2 class="tag__primary">{{ results[0].label }}</h2>
+        <p class="tag__confidence">{{ "%.1f"|format(results[0].confidence) }}% confidence</p>
+
+        {% if results|length > 1 %}
+        <ul class="tag__runners">
+          {% for r in results[1:] %}
+          <li>
+            <span>{{ r.label }}</span>
+            <span class="tag__runner-conf">{{ "%.1f"|format(r.confidence) }}%</span>
+          </li>
+          {% endfor %}
+        </ul>
+        {% endif %}
+      </div>
+    </section>
+    {% endif %}
+
+    <footer class="footer">
+      Built with MobileNetV2 transfer learning, fine-tuned on the PlantVillage dataset — 99.10% validation accuracy.
+    </footer>
+  </main>
+
+  <script>
+    const input = document.getElementById('leaf_image');
+    const dropzone = document.getElementById('dropzone');
+    const preview = document.getElementById('preview');
+    const emptyState = document.getElementById('dropzone-empty');
+
+    function showPreview(file) {
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        preview.src = e.target.result;
+        preview.hidden = false;
+        emptyState.hidden = true;
+      };
+      reader.readAsDataURL(file);
+    }
+
+    input.addEventListener('change', () => showPreview(input.files[0]));
+
+    ['dragover', 'dragleave', 'drop'].forEach((evt) => {
+      dropzone.addEventListener(evt, (e) => e.preventDefault());
+    });
+    dropzone.addEventListener('dragover', () => dropzone.classList.add('dropzone--active'));
+    dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dropzone--active'));
+    dropzone.addEventListener('drop', (e) => {
+      dropzone.classList.remove('dropzone--active');
+      const file = e.dataTransfer.files[0];
+      if (file) {
+        input.files = e.dataTransfer.files;
+        showPreview(file);
+      }
+    });
+  </script>
+</body>
+</html>
