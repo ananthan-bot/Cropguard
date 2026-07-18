@@ -26,3 +26,4 @@ Thumbs.db
 # Env secrets
 .env
 .kaggle/
+models/cropguard.tflite
