@@ -2,6 +2,7 @@
 app/app.py
 
 CropGuard demo: upload a leaf photo, get back the predicted disease + confidence.
+Powered by the quantized TFLite model for lightweight deployment.
 
 Usage:
     python app/app.py
@@ -17,25 +18,29 @@ from flask import Flask, jsonify, render_template, request
 from PIL import Image
 
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
-MODEL_PATH = os.path.join(APP_DIR, "..", "models", "best_model.h5")
+MODEL_PATH = os.path.join(APP_DIR, "..", "models", "cropguard_quant.tflite")
 CLASS_NAMES_PATH = os.path.join(APP_DIR, "..", "models", "class_names.json")
 IMG_SIZE = 224
 
 app = Flask(__name__)
 
-model = None
+interpreter = None
+input_details = None
+output_details = None
 class_names = None
 
 
 def get_model():
-    global model, class_names
-    if model is None:
-        print(f"Loading model from {MODEL_PATH} ...")
-        model = tf.keras.models.load_model(MODEL_PATH)
+    global interpreter, input_details, output_details, class_names
+    if interpreter is None:
+        print(f"Loading TFLite model from {MODEL_PATH} ...")
+        interpreter = tf.lite.Interpreter(model_path=MODEL_PATH)
+        interpreter.allocate_tensors()
+        input_details = interpreter.get_input_details()
+        output_details = interpreter.get_output_details()
         with open(CLASS_NAMES_PATH) as f:
             class_names = json.load(f)
-        print("Model loaded OK")
-    return model, class_names
+    return interpreter, class_names
 
 
 def prettify(label: str) -> str:
@@ -46,19 +51,22 @@ def prettify(label: str) -> str:
 
 
 def predict_image(pil_image: Image.Image, top_k: int = 3):
-    model, class_names = get_model()
+    interp, names = get_model()
 
     img = pil_image.convert("RGB").resize((IMG_SIZE, IMG_SIZE))
     arr = np.array(img, dtype=np.float32)
     arr = tf.keras.applications.mobilenet_v2.preprocess_input(arr)
-    arr = np.expand_dims(arr, axis=0)
+    arr = np.expand_dims(arr, axis=0).astype(input_details[0]["dtype"])
 
-    preds = model.predict(arr, verbose=0)[0]
+    interp.set_tensor(input_details[0]["index"], arr)
+    interp.invoke()
+    preds = interp.get_tensor(output_details[0]["index"])[0]
+
     top_indices = preds.argsort()[-top_k:][::-1]
 
     results = [
         {
-            "label": prettify(class_names[str(i)]),
+            "label": prettify(names[str(i)]),
             "confidence": float(preds[i]) * 100,
         }
         for i in top_indices
